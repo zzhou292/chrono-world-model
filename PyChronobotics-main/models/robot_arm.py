@@ -40,7 +40,61 @@ class RobotiqGripper:
         self.finger_1 = self.system.SearchBody("finger_1-1")
         self.finger_2 = self.system.SearchBody("finger_2-1")
 
- 
+        # set colors for each body part
+        self.base.GetVisualShape(0).SetColor(chrono.ChColor(0.8, 0.1, 0.1))
+        self.biceps.GetVisualShape(0).SetColor(chrono.ChColor(0.1, 0.8, 0.1))
+        self.elbow.GetVisualShape(0).SetColor(chrono.ChColor(0.1, 0.1, 0.8))
+        self.shoulder.GetVisualShape(0).SetColor(chrono.ChColor(0.8, 0.8, 0.1))
+        self.endoffactor.GetVisualShape(0).SetColor(chrono.ChColor(0.8, 0.1, 0.8))
+        self.wrist.GetVisualShape(0).SetColor(chrono.ChColor(0.1, 0.8, 0.8))
+        self.finger_1.GetVisualShape(0).SetColor(chrono.ChColor(0.5, 0.5, 0.5))
+        self.finger_2.GetVisualShape(0).SetColor(chrono.ChColor(0.5, 0.5, 0.5))
+
+        self.wrist.EnableCollision(True)
+
+        # Reset collision shapes for fingers
+        if self.finger_1 and self.finger_2:
+            print("Resetting finger collision shapes...")
+            
+            # Create appropriate contact material based on system type
+            if self.system.GetContactMethod() == chrono.ChContactMethod_SMC:
+                finger_material = chrono.ChContactMaterialSMC()
+                finger_material.SetFriction(0.8)
+                finger_material.SetRestitution(0.1)
+                finger_material.SetYoungModulus(2e6)
+                finger_material.SetPoissonRatio(0.3)
+                finger_material.SetAdhesion(0)
+                finger_material.SetKn(2e6)
+                finger_material.SetGn(40)
+                finger_material.SetKt(2e6)
+                finger_material.SetGt(20)
+            else:
+                finger_material = chrono.ChContactMaterialNSC()
+                finger_material.SetFriction(0.8)
+                finger_material.SetRestitution(0.1)
+            
+            # Reset collision shapes for both fingers
+            fingers = [self.finger_1, self.finger_2]
+            for i, finger in enumerate(fingers):
+                # Clear existing collision model
+                finger.GetCollisionModel().Clear()
+                
+                # Create new collision shape (adjust dimensions based on your finger size)
+                finger_size = chrono.ChVector3d(0.01, 0.02, 0.04)  # width, depth, height
+                finger_collision = chrono.ChCollisionShapeBox(finger_material, 
+                                                            finger_size.x, finger_size.y, finger_size.z)
+                
+                # Add collision shape with proper frame
+                finger_frame = chrono.ChFramed(chrono.ChVector3d(0, 0, 0), chrono.QUNIT)
+                finger.AddCollisionShape(finger_collision, finger_frame)
+                
+                # Enable collision
+                finger.EnableCollision(True)
+
+                print(f"Finger {i+1} collision shape reset successfully")
+            
+            print("Finger collision shapes configured for collision detection")
+
 
         # create name for each marker
         self.joint_base_shoulder = self.system.SearchMarker("MARKER_1")
@@ -265,6 +319,32 @@ class RobotMoveo:
         self.endoffactor = self.system.SearchBody("endeffector")  # ----
         self.finger_1 = self.system.SearchBody("finger-1")
         self.finger_2 = self.system.SearchBody("finger-2")
+
+        # Add NSC contact materials to gripper fingers
+        #if self.system.GetContactMethod() == chrono.ChContactMethod_NSC:
+            # Create NSC contact material
+        #    finger_material = chrono.ChContactMaterialNSC()
+        #    finger_material.SetFriction(0.8)
+        ##    finger_material.SetRestitution(0.1)
+        #    finger_material.SetYoungModulus(2e8)
+        #    finger_material.SetPoissonRatio(0.3)
+            
+            # Apply material to all robot bodies, especially fingers
+        #    robot_bodies = [self.base, self.biceps, self.elbow, self.shoulder, 
+        #                self.endoffactor, self.wrist, self.finger_1, self.finger_2]
+            
+        #    for body in robot_bodies:
+        #        if body:
+        #            # Get existing collision shapes and update their material
+        #            for i in range(body.GetCollisionModel().GetNumShapes()):
+        #                shape = body.GetCollisionModel().GetShape(i)
+        #                if hasattr(shape, 'SetMaterial'):
+        #                    shape.SetMaterial(finger_material)
+                    
+        #            # Enable collision for fingers specifically
+        #            if body == self.finger_1 or body == self.finger_2:
+        #                body.EnableCollision(True)
+
 
         # create name for each marker
         self.joint_base_shoulder = self.system.SearchMarker("base_shoulder")

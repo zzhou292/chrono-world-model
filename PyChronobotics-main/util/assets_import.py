@@ -63,7 +63,7 @@ class AssetsImporter:
                 contact_material = chrono.ChContactMaterialSMC()
 
             contact_material.SetRollingFriction(rolling_friction)
-            collision_shape = chrono.ChCollisionShapeTriangleMesh(contact_material, mesh, False, False, 0.01)
+            collision_shape = chrono.ChCollisionShapeTriangleMesh(contact_material, mesh, False, False, 0.02)
             body.AddCollisionShape(collision_shape)
             body.EnableCollision(True)
 
@@ -77,8 +77,29 @@ class AssetsImporter:
             position (chrono.ChVector3d): The position of the table.
             collidable (bool): Flag to enable collision for the table."""
         
-        table_mesh = self.load_mesh(self.project_root + '/data/test_objs/table.obj', scale=0.01)
-        return self.create_body(mesh=table_mesh, position=position, collidable=collidable)
+        ##table_mesh = self.load_mesh(self.project_root + '/data/test_objs/table.obj', scale=0.01)
+        #return self.create_body(mesh=table_mesh, position=position, collidable=collidable)
+
+                # initialize mug visual shape
+        if self.system.GetContactMethod() == 0:
+            contact_material = chrono.ChContactMaterialNSC()
+        else:
+            contact_material = chrono.ChContactMaterialSMC()
+
+
+        table = chrono.ChBodyEasyMesh(self.project_root + '/data/test_objs/table_scaled.obj', # mesh filename
+                                    3000,             # density kg/m^3
+                                    True,             # automatically compute mass and inertia
+                                    True,             # visualize?>
+                                    True,             # collide?
+                                    contact_material, # contact material
+                                    )
+        table.SetPos(position)
+        table.SetRot(chrono.Q_ROTATE_Y_TO_X)
+        # assign a wood like color
+        table.GetVisualShape(0).SetColor(chrono.ChColor(0.8, 0.52, 0.25))
+        self.system.Add(table)
+
     
     def box(self, dimension = [1,1,1], position=chrono.ChVector3d(0, 0, 0), rot = chrono.Q_ROTATE_Y_TO_Z, collidable=True):
         """Import a box asset into the system, formed by a mesh loaded from a file.
@@ -93,6 +114,8 @@ class AssetsImporter:
             box_material = chrono.ChContactMaterialNSC()
         else:
             box_material = chrono.ChContactMaterialSMC()
+
+        box_material.SetKn(2e7)
         box = chrono.ChBodyEasyBox(dimension[0],dimension[1],dimension[2], 1000, True, True, box_material)
         box.GetVisualShape(0).SetTexture(chrono.GetChronoDataFile("textures/bluewhite.png"))
         box.SetName("box")
@@ -103,22 +126,15 @@ class AssetsImporter:
         self.system.Add(box)
         return box
 
-    def mug(self, position=chrono.ChVector3d(0, 0, 0), collidable=True, rolling_friction=0.01):
-        """Import a mug asset into the system, formed by a mesh loaded from a file. Note that the mug's collision shape is a cylinder.
+
+    def flashlight(self, position=chrono.ChVector3d(0, 0, 0), collidable=True, rolling_friction=0.01):
+        """Import a green cone asset into the system, formed by a mesh loaded from a file. Note that the cone's collision shape is a cylinder.
         while the visualization is a mesh.
         
         Args:
             position (chrono.ChVector3d): The position of the mug.
             collidable (bool): Flag to enable collision for the mug."""
         # initialize mug visual shape
-        mug_mesh = chrono.ChTriangleMeshConnected()
-        mug_mesh.LoadWavefrontMesh(self.project_root + '/data/test_objs/newMug.obj', False, True)
-        mug_mesh.Transform(chrono.ChVector3d(0, -0.05, 0), chrono.ChMatrix33d(0.05))
-        mug_shape = chrono.ChVisualShapeTriangleMesh()
-        mug_shape.SetMesh(mug_mesh)
-        mug_shape.SetMutable(False)
-
-
         if self.system.GetContactMethod() == 0:
             contact_material = chrono.ChContactMaterialNSC()
         else:
@@ -127,23 +143,16 @@ class AssetsImporter:
         contact_material.SetRollingFriction(rolling_friction)
 
 
-        mug = chrono.ChBody()
-        mug.AddVisualShape(mug_shape) 
-        mug.SetName("mug")
-
-        # initialize mug collision shape
-
-        mug_ct_shape = chrono.ChCollisionShapeTriangleMesh(contact_material, mug_mesh, False, False)
-        mug.AddCollisionShape(mug_ct_shape)
-        mug.EnableCollision(True)
-
-        mug.SetPos(position)
-        mug.SetRot(chrono.Q_ROTATE_Y_TO_Z)
-
-
-        self.system.Add(mug)
-
-        return mug
+        gcone = chrono.ChBodyEasyMesh(self.project_root + '/data/flashlight_final/flashlight_final.obj', # mesh filename
+                                    1000,             # density kg/m^3
+                                    True,             # automatically compute mass and inertia
+                                    True,             # visualize?>
+                                    True,             # collide?
+                                    contact_material, # contact material
+                                    )
+        gcone.SetPos(position)
+        gcone.GetVisualShape(0).SetColor(chrono.ChColor(0.2, 0.6, 0.2))
+        self.system.Add(gcone)
 
 
     # You can add more asset-loading functions similarly

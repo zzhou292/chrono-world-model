@@ -1,6 +1,7 @@
 import pychrono as chrono
 import pychrono.irrlicht as chronoirr
 import pychrono.sensor as sens
+import pygame
 
 import sys
 import os
@@ -15,8 +16,20 @@ import math
 from util.InverseKinematics import RobotArmInverseKinematicsSolver
 from util.assets_import import AssetsImporter
 
+# Initialize pygame and joystick
+pygame.init()
+pygame.joystick.init()
 
-system = chrono.ChSystemNSC()
+# Check for joystick
+if pygame.joystick.get_count() == 0:
+    print("No joystick detected!")
+    joystick = None
+else:
+    joystick = pygame.joystick.Joystick(0)
+    joystick.init()
+    print(f"Joystick '{joystick.get_name()}' initialized")
+
+system = chrono.ChSystemSMC()
 system.SetCollisionSystemType(chrono.ChCollisionSystem.Type_BULLET)
 
 system.SetGravitationalAcceleration(chrono.ChVector3d(0, 0, -9.81))
@@ -25,7 +38,7 @@ gripper = RobotiqGripper(system, chrono.ChVector3d(0, 0, 1.06))
 
 ### Create environment
 # Create a floor --------------------------------------------------------------------
-floor_material = chrono.ChContactMaterialNSC()
+floor_material = chrono.ChContactMaterialSMC()
 floor = chrono.ChBodyEasyBox(100, 100, 0.01, 1000, True, True, floor_material)
 floor.SetPos(chrono.ChVector3d(0, 0, -0.042 - 1.06))
 floor.SetFixed(True)
@@ -65,8 +78,8 @@ assets_importer = AssetsImporter(system)
 table = assets_importer.table(chrono.ChVector3d(0, 0, 0.45 - 0.98), collidable=True)
 
 
-#mug = assets_importer.mug(chrono.ChVector3d(0.03, 0.655, 0.1),collidable=True)
-#gripper.add_object("mug")
+flashlight = assets_importer.flashlight(chrono.ChVector3d(0.03, 0.655, 0.1),collidable=True)
+gripper.add_object("flashlight")
 
 
 
@@ -85,8 +98,8 @@ out_dir = "SENSOR_OUTPUT/"
 irr_out_dir = "temp_img/"
 lens_model = sens.PINHOLE
 update_rate = 30
-image_width = 1280
-image_height = 720
+image_width = 640
+image_height = 480
 fov = 1.408
 lag = 0
 exposure_time = 0
@@ -124,38 +137,81 @@ manager.AddSensor(cam) # Turned off
 ### Simulation Setup
 # Irrlicht Visualization
 vis = chronoirr.ChVisualSystemIrrlicht(system)
+vis.EnableCollisionShapeDrawing(True)
+vis.SetWindowTitle("robot arm gripper")
+vis.SetWindowSize(2560, 1440)  # Your desired resolution
 vis.SetCameraPosition(chrono.ChVector3d(0, 0, 1))
 vis.SetCameraVertical(chrono.CameraVerticalDir_Z)
-vis.SetWindowSize(1024, 768)
-vis.SetWindowTitle("robot arm gripper")
+
 vis.Initialize()
-vis.AddSkyBox()
+
+# Add these after initialization
+vis.AddSkyBox()  # Uncomment this line
 vis.AddCamera(chrono.ChVector3d(-1, -1, 1), chrono.ChVector3d(0, 0, 0))
+
+
 # Reduce the light magnitude
 # vis.AddLightWithShadow(chrono.ChVector3d(10, 10, 100), chrono.ChVector3d(0, 0, -0.5), 100, 1, 9, 90, 512)
 
 timestep = 0.001
 rt_timer = chrono.ChRealtimeStepTimer()
 
-solver = chrono.ChSolverPSOR()
-solver.SetMaxIterations(400)
-solver.SetTolerance(1e-6)
-# solver.EnableWarmStart(True)
-# solver.EnableDiagonalPreconditioner(True)
-system.SetSolver(solver)
+
+# Initialize desired position
+desired_position = np.array([0.0, 0.6, -0.05])  # Starting position
+movement_speed = 0.0001  # m/s per time step
 
 step_number = 0
 save_img = True
-render_step_size = 1.0 / 20  # FPS = 25
+render_step_size = 1.0 / 60  # FPS = 25
 control_step_size = 1.0 / 20
 render_steps = math.ceil(render_step_size / timestep)
 control_steps = math.ceil(control_step_size / timestep)
 render_frame = 0
 control_step = 0
+
 while vis.Run():
     sim_time = system.GetChTime()
     system.DoStepDynamics(timestep)
     manager.Update()
+    
+    # Handle pygame events and joystick input
+    if joystick:
+        pygame.event.pump()  # Update joystick state
+        
+        # Get joystick axis values
+        # Left stick: axis 0 = X, axis 1 = Y
+        axis_x = joystick.get_axis(0)  # Left stick horizontal (-1 to 1)
+        axis_y = joystick.get_axis(1)  # Left stick vertical (-1 to 1)
+        
+        axis_right_y = joystick.get_axis(4)  # Right stick vertical (-1 to 1)
+        
+        # Apply deadzone to prevent drift
+        deadzone = 0.1
+        if abs(axis_x) < deadzone:
+            axis_x = 0
+        if abs(axis_y) < deadzone:
+            axis_y = 0
+        if abs(axis_right_y) < deadzone:
+            axis_right_y = 0
+        
+        # Update desired position based on joystick input
+        # Left stick controls X and Y movement
+        desired_position[0] += axis_x * movement_speed  # X movement
+        desired_position[1] += -axis_y * movement_speed  # Y movement (inverted)
+        
+        # Right stick Y-axis controls Z movement
+        desired_position[2] += -axis_right_y * movement_speed  # Z movement (inverted so up = positive Z)
+        
+        # Optional: Add limits to prevent going too far
+        desired_position[0] = np.clip(desired_position[0], -1.0, 1.0)
+        desired_position[1] = np.clip(desired_position[1], 0.2, 1.2)
+        desired_position[2] = np.clip(desired_position[2], -0.15, 0.4)
+        
+        # Optional: Print joystick values for debugging
+        if step_number % 100 == 0:  # Print every 100 steps to avoid spam
+            print(f"Joystick - Left: ({axis_x:.2f}, {axis_y:.2f}), Right Y: {axis_right_y:.2f}")
+            print(f"Position: X={desired_position[0]:.3f}, Y={desired_position[1]:.3f}, Z={desired_position[2]:.3f}")
     
     if step_number % render_steps == 0:
         vis.BeginScene()
@@ -166,64 +222,29 @@ while vis.Run():
             print(filename)
             vis.WriteImageToFile(filename)
             render_frame += 1
-        # manager.Update()
+    
     if step_number % control_steps == 0:
-        if 3<sim_time < 5:
-            # @ Harry to do, need to make this further modularized
-            # desired_position = np.array([ball1.GetPos().x , ball1.GetPos().y - 0.03, ball1.GetPos().z + 0.03])
-            # desired_position = np.array([ball1.GetPos().x , ball1.GetPos().y - 0.03, ball1.GetPos().z + 0.2])
-
-            desired_position = np.array([box.GetPos().x+0.2, box.GetPos().y + 0.1, box.GetPos().z + 0.0]) #cylinder or box
-            #desired_position = np.array([mug.GetPos().x, mug.GetPos().y - 0.17, mug.GetPos().z + 0.2])
-
-
-            initial_guess = np.array([np.arctan2(desired_position[1],desired_position[0]), math.pi/2, 0.0, 0.0])
-            final_theta = IK_solver.inverse_kinematics_solver(desired_position, initial_guess)
-
-            print(final_theta)
-            
-            #gripper.open()
-            gripper.rotate_motor(gripper.motor_base_shoulder, final_theta[0])
-            gripper.rotate_motor(gripper.motor_shoulder_biceps, final_theta[1])
-            gripper.rotate_motor(gripper.motor_biceps_elbow, final_theta[2])
-            gripper.rotate_motor(gripper.motor_elbow_wrist, final_theta[3])
-            
-        # # if 5 < sim_time < 7:
-        #     # gripper.close()
-
-
-        if 5 < sim_time < 7:
-            # @ Harry to do, need to make this further modularized
-            # desired_position = np.array([box.GetPos().x, box.GetPos().y, box.GetPos().z + 0.05]) #cylinder or box
-
-            desired_position = np.array([box.GetPos().x-0.2, box.GetPos().y + 0.1, box.GetPos().z + 0.0])
-
-
-            initial_guess = np.array([np.arctan2(desired_position[1],desired_position[0]), math.pi/2, 0.0, 0.0])
-            final_theta = IK_solver.inverse_kinematics_solver(desired_position, initial_guess)
-            
-            #gripper.open()
-            gripper.rotate_motor(gripper.motor_base_shoulder, final_theta[0])
-            gripper.rotate_motor(gripper.motor_shoulder_biceps, final_theta[1])
-            gripper.rotate_motor(gripper.motor_biceps_elbow, final_theta[2])
-            gripper.rotate_motor(gripper.motor_elbow_wrist, final_theta[3])
-
-        #if 7 < sim_time < 15:
-            #gripper.grab_object()
-
-            
-        if 15 < sim_time < 17:
-            gripper.rotate_motor(gripper.motor_base_shoulder, 0)
-            gripper.rotate_motor(gripper.motor_shoulder_biceps, math.pi/2)
-            
-            
-        if sim_time > 18:
-            # gripper.rotate_motor(gripper.motor_biceps_elbow, math.pi/3)
-            gripper.open()
-            # @Sriram to do, need to further change this. like the distance based detection need to be refined. Cuz the inverse
-            # kinematics can't accurately reach the exact center of the object. Maybe talk more once we got the chance.
-
-
-        
+        if sim_time > 3:  # Start joystick control after 3 seconds
+            try:
+                initial_guess = np.array([np.arctan2(desired_position[1], desired_position[0]), math.pi/2, 0.0, 0.0])
+                final_theta = IK_solver.inverse_kinematics_solver(desired_position, initial_guess)
+                
+                print(f"Desired position: {desired_position}")
+                print(f"Joint angles: {final_theta}")
+                
+                gripper.rotate_motor(gripper.motor_base_shoulder, final_theta[0])
+                gripper.rotate_motor(gripper.motor_shoulder_biceps, final_theta[1])
+                gripper.rotate_motor(gripper.motor_biceps_elbow, final_theta[2])
+                gripper.rotate_motor(gripper.motor_elbow_wrist, final_theta[3])
+                
+            except ValueError as e:
+                print(f"IK solver failed: {e}")
+                print(f"Target position may be unreachable: {desired_position}")
+    
     rt_timer.Spin(timestep)
     step_number += 1
+
+# Cleanup pygame when done
+if joystick:
+    pygame.joystick.quit()
+pygame.quit()
