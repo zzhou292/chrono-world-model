@@ -102,12 +102,11 @@ body_3_1_shape.SetMutable(False)
 body_3.AddVisualShape(body_3_1_shape, chrono.ChFramed(chrono.ChVector3d(0,0,0), chrono.ChQuaterniond(1,0,0,0)))
 
 # Collision shape
-contact_material = chrono.ChContactMaterialNSC()
-contact_material.SetRollingFriction(0.05)
-body_3.AddCollisionShape(chrono.ChCollisionShapeBox(contact_material,0.04,0.03,-0.01), chrono.ChFramed(chrono.ChVector3d(0, 0.051, -0.0273), chrono.QUNIT))
-
+contact_material = chrono.ChContactMaterialSMC()
+body_3_1_collision_shape = chrono.ChCollisionShapeTriangleMesh(contact_material, body_3_1_mesh, False, False, 0.001)
+body_3.AddCollisionShape(body_3_1_collision_shape)
+body_3.GetCollisionModel().SetFamily(2)
 body_3.EnableCollision(True)
-
 
 exported_items.append(body_3)
 
@@ -133,6 +132,12 @@ body_4_1_shape.SetMutable(False)
 
 body_4.AddVisualShape(body_4_1_shape, chrono.ChFramed(chrono.ChVector3d(0,0,0), chrono.ChQuaterniond(1,0,0,0)))
 
+# Collision shape
+contact_material = chrono.ChContactMaterialSMC()
+body_4.AddCollisionShape(chrono.ChCollisionShapeBox(contact_material,0.05,0.03,0.05))
+body_4.EnableCollision(True)
+body_4.GetCollisionModel().SetFamily(3)
+body_4.GetCollisionModel().DisallowCollisionsWith(2)
 exported_items.append(body_4)
 
 
@@ -254,10 +259,10 @@ body_6_1_shape.SetMutable(False)
 body_6.AddVisualShape(body_6_1_shape, chrono.ChFramed(chrono.ChVector3d(0,0,0), chrono.ChQuaterniond(1,0,0,0)))
 
 # Collision shape
-contact_material = chrono.ChContactMaterialNSC()
-contact_material.SetRollingFriction(0.05)
-body_6.AddCollisionShape(chrono.ChCollisionShapeBox(contact_material,0.04,0.03,-0.01), chrono.ChFramed(chrono.ChVector3d(0, 0.051, 0.0273), chrono.QUNIT))
-
+contact_material = chrono.ChContactMaterialSMC()
+body_6_1_collision_shape = chrono.ChCollisionShapeTriangleMesh(contact_material, body_6_1_mesh, False, False, 0.001)
+body_6.AddCollisionShape(body_6_1_collision_shape)
+body_6.GetCollisionModel().SetFamily(2)
 body_6.EnableCollision(True)
 
 exported_items.append(body_6)

@@ -52,50 +52,6 @@ class RobotiqGripper:
 
         self.wrist.EnableCollision(True)
 
-        # Reset collision shapes for fingers
-        if self.finger_1 and self.finger_2:
-            print("Resetting finger collision shapes...")
-            
-            # Create appropriate contact material based on system type
-            if self.system.GetContactMethod() == chrono.ChContactMethod_SMC:
-                finger_material = chrono.ChContactMaterialSMC()
-                finger_material.SetFriction(0.8)
-                finger_material.SetRestitution(0.1)
-                finger_material.SetYoungModulus(2e6)
-                finger_material.SetPoissonRatio(0.3)
-                finger_material.SetAdhesion(0)
-                finger_material.SetKn(2e6)
-                finger_material.SetGn(40)
-                finger_material.SetKt(2e6)
-                finger_material.SetGt(20)
-            else:
-                finger_material = chrono.ChContactMaterialNSC()
-                finger_material.SetFriction(0.8)
-                finger_material.SetRestitution(0.1)
-            
-            # Reset collision shapes for both fingers
-            fingers = [self.finger_1, self.finger_2]
-            for i, finger in enumerate(fingers):
-                # Clear existing collision model
-                finger.GetCollisionModel().Clear()
-                
-                # Create new collision shape (adjust dimensions based on your finger size)
-                finger_size = chrono.ChVector3d(0.01, 0.02, 0.04)  # width, depth, height
-                finger_collision = chrono.ChCollisionShapeBox(finger_material, 
-                                                            finger_size.x, finger_size.y, finger_size.z)
-                
-                # Add collision shape with proper frame
-                finger_frame = chrono.ChFramed(chrono.ChVector3d(0, 0, 0), chrono.QUNIT)
-                finger.AddCollisionShape(finger_collision, finger_frame)
-                
-                # Enable collision
-                finger.EnableCollision(True)
-
-                print(f"Finger {i+1} collision shape reset successfully")
-            
-            print("Finger collision shapes configured for collision detection")
-
-
         # create name for each marker
         self.joint_base_shoulder = self.system.SearchMarker("MARKER_1")
         self.joint_shoulder_biceps = self.system.SearchMarker("MARKER_2")

@@ -75,16 +75,16 @@ assets_importer = AssetsImporter(system)
 
 # Create Table --------------------------------------------------------------------
 # Load and add the table
-table = assets_importer.table(chrono.ChVector3d(0, 0, 0.45 - 0.98), collidable=True)
+table = assets_importer.table(chrono.ChVector3d(0, 0, 0.45 - 0.7), collidable=True)
 
 
-flashlight = assets_importer.flashlight(chrono.ChVector3d(0.03, 0.655, 0.1),collidable=True)
+flashlight = assets_importer.flashlight(chrono.ChVector3d(0.03, 0.655, 0.02),collidable=True)
 gripper.add_object("flashlight")
 
 
 
 # Create a box --------------------------------------------------------------------
-box = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(0.03, 0.8, 0.1), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
+box = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(0.03, 0.8, 0.0), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
 gripper.add_object("box")
 
 # Inverse Kinematics Solver ---------------------------------------------------------
