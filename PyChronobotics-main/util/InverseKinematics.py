@@ -56,7 +56,7 @@ class RobotArmInverseKinematicsSolver:
     def inverse_kinematics_solver(self, target_position, initial_guess, tolerance=1e-6):
         print("initial guess:", initial_guess)
         result = minimize(self.objective_function, initial_guess, args=(target_position,),
-                        method='BFGS', options={'gtol': 1e-6, 'maxiter': 1000})
+                        method='BFGS', options={'gtol': 1e-8, 'maxiter': 1000})
         
         print('Optimization result:', result)
         
