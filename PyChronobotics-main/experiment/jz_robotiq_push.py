@@ -78,14 +78,32 @@ assets_importer = AssetsImporter(system)
 table = assets_importer.table(chrono.ChVector3d(0, 0, 0.45 - 0.7), collidable=True)
 
 
-flashlight = assets_importer.flashlight(chrono.ChVector3d(0.03, 0.655, 0.02),collidable=True)
-gripper.add_object("flashlight")
+flashlight0 = assets_importer.flashlight(chrono.ChVector3d(0.1, 0.655, 0.02),collidable=True)
+gripper.add_object("flashlight0")
 
+flashlight1 = assets_importer.flashlight(chrono.ChVector3d(-0.1, 0.655, 0.02),collidable=True)
+gripper.add_object("flashlight1")
+
+flashlight2 = assets_importer.flashlight(chrono.ChVector3d(0.15, 0.5, 0.02),collidable=True)
+gripper.add_object("flashlight2")
+
+flashlight3 = assets_importer.flashlight(chrono.ChVector3d(-0.13, 0.55, 0.02),collidable=True)
+gripper.add_object("flashlight3")
 
 
 # Create a box --------------------------------------------------------------------
-box = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(0.03, 0.8, 0.0), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
-gripper.add_object("box")
+box0 = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(0.05, 0.8, 0.0), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
+gripper.add_object("box0")
+
+box1 = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(-0.05, 0.8, 0.0), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
+gripper.add_object("box1")
+
+box2 = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(0.12, 0.85, 0.0), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
+gripper.add_object("box2")
+
+box3 = assets_importer.box([0.05, 0.13, 0.05], chrono.ChVector3d(-0.14, 0.83, 0.0), chrono.Q_ROTATE_Y_TO_Z, collidable=True)
+gripper.add_object("box3")
+
 
 # Inverse Kinematics Solver ---------------------------------------------------------
 IK_solver = RobotArmInverseKinematicsSolver('robotiq-3dof')
@@ -94,8 +112,8 @@ IK_solver = RobotArmInverseKinematicsSolver('robotiq-3dof')
 ### Add sensors
 # Add camera sensor --------------------------------------------------------------------
 
-out_dir = "SENSOR_OUTPUT/"
-irr_out_dir = "temp_img/"
+sen_out_dir = "sensor_img/"
+irr_out_dir = "irr_img/"
 lens_model = sens.PINHOLE
 update_rate = 30
 image_width = 640
@@ -131,6 +149,7 @@ cam.SetCollectionWindow(exposure_time)
 cam.PushFilter(sens.ChFilterVisualize(
     image_width, image_height, "Arm Camera"))
 cam.PushFilter(sens.ChFilterRGBA8Access())
+cam.PushFilter(sens.ChFilterSave(sen_out_dir))
 
 manager.AddSensor(cam) # Turned off
 
@@ -147,11 +166,11 @@ vis.Initialize()
 
 # Add these after initialization
 vis.AddSkyBox()  # Uncomment this line
-vis.AddCamera(chrono.ChVector3d(-1, -1, 1), chrono.ChVector3d(0, 0, 0))
+vis.AddCamera(chrono.ChVector3d(-0.6, 1.8, 0.8), chrono.ChVector3d(0, 0.6, 0))
 
 
 # Reduce the light magnitude
-# vis.AddLightWithShadow(chrono.ChVector3d(10, 10, 100), chrono.ChVector3d(0, 0, -0.5), 100, 1, 9, 90, 512)
+#is.AddLightWithShadow(chrono.ChVector3d(10, 10, 100), chrono.ChVector3d(0, 0, -0.5), 100, 1, 9, 90, 512)
 
 timestep = 0.001
 rt_timer = chrono.ChRealtimeStepTimer()
@@ -159,7 +178,7 @@ rt_timer = chrono.ChRealtimeStepTimer()
 
 # Initialize desired position
 desired_position = np.array([0.0, 0.6, -0.05])  # Starting position
-movement_speed = 0.0001  # m/s per time step
+movement_speed = 0.0002  # m/s per time step
 
 step_number = 0
 save_img = True
@@ -204,9 +223,9 @@ while vis.Run():
         desired_position[2] += -axis_right_y * movement_speed  # Z movement (inverted so up = positive Z)
         
         # Optional: Add limits to prevent going too far
-        desired_position[0] = np.clip(desired_position[0], -1.0, 1.0)
-        desired_position[1] = np.clip(desired_position[1], 0.2, 1.2)
-        desired_position[2] = np.clip(desired_position[2], -0.15, 0.4)
+        desired_position[0] = np.clip(desired_position[0], -0.4, 0.4)
+        desired_position[1] = np.clip(desired_position[1], 0.4, 0.95)
+        desired_position[2] = np.clip(desired_position[2], -0.15, 0.3)
         
         # Optional: Print joystick values for debugging
         if step_number % 100 == 0:  # Print every 100 steps to avoid spam
@@ -226,7 +245,10 @@ while vis.Run():
     if step_number % control_steps == 0:
         if sim_time > 3:  # Start joystick control after 3 seconds
             try:
-                initial_guess = np.array([np.arctan2(desired_position[1], desired_position[0]), math.pi/2, 0.0, 0.0])
+                if 'prev_control_command' in locals():
+                    initial_guess = prev_control_command
+                else:
+                    initial_guess = np.array([np.arctan2(desired_position[1], desired_position[0]), math.pi/2, 0.0, 0.0])
                 final_theta = IK_solver.inverse_kinematics_solver(desired_position, initial_guess)
                 
                 print(f"Desired position: {desired_position}")
@@ -236,11 +258,14 @@ while vis.Run():
                 gripper.rotate_motor(gripper.motor_shoulder_biceps, final_theta[1])
                 gripper.rotate_motor(gripper.motor_biceps_elbow, final_theta[2])
                 gripper.rotate_motor(gripper.motor_elbow_wrist, final_theta[3])
+                prev_control_command = final_theta
                 
             except ValueError as e:
                 print(f"IK solver failed: {e}")
                 print(f"Target position may be unreachable: {desired_position}")
-    
+
+
+
     rt_timer.Spin(timestep)
     step_number += 1
 
