@@ -6,6 +6,27 @@ import csv
 import sys
 import os
 import numpy as np
+import argparse
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Robot arm simulation with joystick control')
+parser.add_argument('--output-dir', '-o', type=str, default='output', 
+                   help='Output directory for all files (CSV, images, sensor data)')
+args = parser.parse_args()
+
+# Create output directory if it doesn't exist
+output_dir = args.output_dir
+os.makedirs(output_dir, exist_ok=True)
+
+# Create subdirectories for different types of output
+sen_out_dir = os.path.join(output_dir, "sensor_img/")
+irr_out_dir = os.path.join(output_dir, "irr_img/")
+os.makedirs(sen_out_dir, exist_ok=True)
+os.makedirs(irr_out_dir, exist_ok=True)
+
+print(f"Output directory: {output_dir}")
+print(f"Sensor images: {sen_out_dir}")
+print(f"Irrlicht images: {irr_out_dir}")
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
@@ -63,13 +84,14 @@ class OrnsteinUhlenbeckProcess:
         self.x_prev = np.zeros(self.size)
 
 # Initialize OU process for 3D movement (x, y, z) with minimum magnitude
+# For extremely frequent direction changes
 ou_process = OrnsteinUhlenbeckProcess(
     size=3,
-    theta=0.02,    # Very slow mean reversion = long directional movements
+    theta=5.0,     # Extremely high mean reversion = constant direction changes
     mu=0.0,        
-    sigma=0.15,    # Slightly reduce noise for smoother movement
-    dt=0.08,       # Longer time step for slower evolution
-    min_magnitude=0.8  # Minimum joystick magnitude
+    sigma=0.5,     # Very high noise for maximum chaos
+    dt=0.04,      # Extremely short time step
+    min_magnitude=0.8
 )
 
 # Initialize pygame and joystick
@@ -168,10 +190,8 @@ IK_solver = RobotArmInverseKinematicsSolver('robotiq-3dof')
 ### Add sensors
 # Add camera sensor --------------------------------------------------------------------
 
-sen_out_dir = "sensor_img/"
-irr_out_dir = "irr_img/"
 lens_model = sens.PINHOLE
-update_rate = 30
+update_rate = 25
 image_width = 640
 image_height = 480
 fov = 1.408
@@ -234,19 +254,19 @@ rt_timer = chrono.ChRealtimeStepTimer()
 
 # Initialize desired position
 desired_position = np.array([0.0, 0.6, -0.05])  # Starting position
-movement_speed = 0.0002  # m/s per time step
+movement_speed = 0.0075  # m/s per control step
 
 step_number = 0
 save_img = True
-render_step_size = 1.0 / 30  # FPS = 30
-control_step_size = 1.0 / 50
+render_step_size = 1.0 / 25  # FPS = 25
+control_step_size = 1.0 / 25
 render_steps = math.ceil(render_step_size / timestep)
 control_steps = math.ceil(control_step_size / timestep)
 render_frame = 0
 control_step = 0
 
 # Initialize CSV file for logging joystick commands
-csv_filename = "joystick_commands.csv"
+csv_filename = os.path.join(output_dir, "joystick_commands.csv")
 csv_file = open(csv_filename, 'w', newline='')
 csv_writer = csv.writer(csv_file)
 csv_writer.writerow(['sim_time', 'axis_x', 'axis_y', 'axis_right_y'])  # Header row
@@ -255,9 +275,9 @@ print(f"Logging joystick commands to: {csv_filename}")
 
 while vis.Run():
     sim_time = system.GetChTime()
-    
-    # Exit simulation after 20 seconds
-    if sim_time >= 20.0:
+
+    # Exit simulation after 40 seconds
+    if sim_time >= 40.0:
         print(f"Simulation completed at {sim_time:.2f} seconds")
         break
     
@@ -265,7 +285,7 @@ while vis.Run():
     manager.Update()
     
     # Handle pygame events and joystick input
-    if joystick:
+    if joystick and step_number % control_steps == 0:
         current_ou_sample = ou_process.sample()
         pygame.event.pump()  # Update joystick state
 
@@ -281,9 +301,6 @@ while vis.Run():
             axis_y = 0
         if abs(axis_right_y) < deadzone:
             axis_right_y = 0
-
-        # Log joystick commands to CSV file
-        csv_writer.writerow([sim_time, axis_x, axis_y, axis_right_y])
 
         if sim_time > 5:
             # Update desired position based on joystick input
@@ -310,13 +327,17 @@ while vis.Run():
         vis.Render()
         vis.EndScene()
         if save_img:    
-            filename = irr_out_dir + str(render_frame) + '.jpg'
+            filename = os.path.join(irr_out_dir, str(render_frame) + '.jpg')
             print(filename)
             vis.WriteImageToFile(filename)
             render_frame += 1
     
     if step_number % control_steps == 0:
-        if sim_time > 2:  # Start joystick control after 4 seconds
+        # Log joystick commands to CSV file only on control steps
+        if joystick:
+            csv_writer.writerow([sim_time, axis_x, axis_y, axis_right_y])
+            
+        if sim_time > 2:  # Start joystick control after 2 seconds
             try:
                 if 'prev_control_command' in locals():
                     initial_guess = prev_control_command
